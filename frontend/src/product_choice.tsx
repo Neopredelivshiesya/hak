@@ -45,7 +45,7 @@ function ProductChoice(){
             onClick={() => toggleSection("cardType")}
             className="w-full px-8 py-6 flex items-center justify-between text-left hover:bg-gray-50 transition"
           >
-            <h2 className="text-xl font-semibold text-gray-800">Тип карты</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Продукт</h2>
             <ChevronDown isOpen={openSections.cardType} />
           </button>
 
