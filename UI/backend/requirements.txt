@@ -1,0 +1,16 @@
+# Web framework
+fastapi
+uvicorn[standard]
+
+# HTTP clients
+requests
+urllib3
+
+# Web scraping
+beautifulsoup4
+
+# NLP/ML
+SentencePiece
+
+# Database
+sqlalchemy
