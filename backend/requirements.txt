@@ -9,8 +9,6 @@ urllib3
 # Web scraping
 beautifulsoup4
 
-# NLP/ML
-SentencePiece
 
 # Database
 sqlalchemy
