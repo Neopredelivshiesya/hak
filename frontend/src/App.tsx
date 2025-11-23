@@ -57,6 +57,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [summarizedResult, setSummarizedResult] = useState<string>("");
   const [comparisonData, setComparisonData] = useState<Record<string, Record<string, string | boolean | number>>>({});
+  const [modelsAnalysisResults, setModelsAnalysisResults] = useState<string[]>([]);
+  const [userQuery, setUserQuery] = useState<string>("");
+  const [isImproving, setIsImproving] = useState(false);
 
   // Загрузка шаблонов из localStorage при загрузке компонента
   useEffect(() => {
@@ -407,6 +410,8 @@ function App() {
     setIsLoading(true);
     setSummarizedResult(""); // Сбрасываем предыдущий результат
     setComparisonData({}); // Сбрасываем данные для графика
+    setModelsAnalysisResults([]); // Сбрасываем результаты анализа моделей
+    setUserQuery(""); // Сбрасываем запрос пользователя
 
     try {
       const response = await fetch("http://localhost:8000/api/params", {
@@ -433,6 +438,12 @@ function App() {
       if (data.data?.comparisonData) {
         console.log("Получены данные для сравнения:", data.data.comparisonData);
         setComparisonData(data.data.comparisonData);
+      }
+
+      // Сохраняем результаты анализа моделей для улучшения
+      if (data.data?.modelsAnalysisResults) {
+        console.log("Получены результаты анализа моделей:", data.data.modelsAnalysisResults.length);
+        setModelsAnalysisResults(data.data.modelsAnalysisResults);
       }
 
       // Сохраняем результат анализа - проверяем несколько возможных путей
@@ -836,11 +847,64 @@ function App() {
                 </div>
 
                 <div className="p-6 border-t">
-                  <input
-                    type="text"
-                    placeholder="Напишите ваш вопрос..."
-                    className="w-full px-5 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!userQuery.trim() || modelsAnalysisResults.length === 0) {
+                        return;
+                      }
+
+                      setIsImproving(true);
+                      try {
+                        const response = await fetch("http://localhost:8000/api/improve", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            userQuery: userQuery.trim(),
+                            modelsAnalysisResults: modelsAnalysisResults,
+                          }),
+                        });
+
+                        if (!response.ok) {
+                          throw new Error("Ошибка при отправке запроса");
+                        }
+
+                        const data = await response.json();
+                        console.log("Ответ от сервера (улучшение):", data);
+
+                        if (data.status === "success" && data.data?.improvedResult) {
+                          setSummarizedResult(data.data.improvedResult);
+                          setUserQuery(""); // Очищаем поле ввода
+                        } else {
+                          alert("Не удалось улучшить анализ. Попробуйте еще раз.");
+                        }
+                      } catch (error) {
+                        console.error("Ошибка:", error);
+                        alert("Не удалось отправить запрос на сервер.");
+                      } finally {
+                        setIsImproving(false);
+                      }
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Напишите ваш вопрос..."
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                      disabled={isImproving || modelsAnalysisResults.length === 0}
+                      className="flex-1 px-5 py-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!userQuery.trim() || isImproving || modelsAnalysisResults.length === 0}
+                      className="px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold"
+                    >
+                      {isImproving ? "Обработка..." : "Отправить"}
+                    </button>
+                  </form>
                 </div>
               </div>
 

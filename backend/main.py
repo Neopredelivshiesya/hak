@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.model_analyze import save_models_results
 from src.model_summarize import save_summarized_result
+from src.model_improve import improve_analysis_with_user_query
 from src.prompts import get_product_analysis_prompt
 import re
 
@@ -94,6 +95,11 @@ class ComparisonRequest(BaseModel):
     banks: List[str]
     criteria: List[str]
 
+# Модель данных для запроса пользователя
+class UserQueryRequest(BaseModel):
+    userQuery: str
+    modelsAnalysisResults: List[str]  # Результаты анализа от моделей
+
 # Эндпоинт для сравнения продуктов
 @app.post("/api/params")
 async def compare_products(request: ComparisonRequest):
@@ -112,11 +118,18 @@ async def compare_products(request: ComparisonRequest):
         criteria = request.criteria
 
         # Генерируем промпт для анализа
-        prompt = get_product_analysis_prompt(banks, criteria)
+        prompt = get_product_analysis_prompt(banks, card_types, criteria)
         
         # Запускаем анализ моделей
         print("=== Запуск анализа моделей ===")
         models_analysis_results = save_models_results(prompt)
+        
+        # Преобразуем результаты в список строк для передачи на фронтенд
+        models_results_list = []
+        if isinstance(models_analysis_results, list):
+            models_results_list = [str(result) if not isinstance(result, str) else result for result in models_analysis_results]
+        else:
+            models_results_list = [str(models_analysis_results)]
         
         # Получаем суммаризированный результат
         print("=== Генерация итогового результата ===")
@@ -147,7 +160,8 @@ async def compare_products(request: ComparisonRequest):
                 "banks": banks,
                 "criteria": criteria,
                 "summarizedResult": summarized_result,  # Передаем результат на фронтенд
-                "comparisonData": comparison_data  # Данные для графика и таблицы
+                "comparisonData": comparison_data,  # Данные для графика и таблицы
+                "modelsAnalysisResults": models_results_list  # Результаты анализа для улучшения
             }
         }
     
@@ -177,6 +191,54 @@ async def read_root():
             "compare": "/api/params (POST)"
         }
     }
+
+@app.post("/api/improve")
+async def improve_analysis(request: UserQueryRequest):
+    """
+    Улучшает анализ на основе запроса пользователя
+    """
+    try:
+        print("=== Получен запрос пользователя ===")
+        print(f"Запрос: {request.userQuery}")
+        print(f"Количество результатов анализа: {len(request.modelsAnalysisResults)}")
+        
+        # Улучшаем анализ на основе запроса пользователя
+        print("=== Улучшение анализа ===")
+        improved_result_dict = improve_analysis_with_user_query(
+            request.modelsAnalysisResults,
+            request.userQuery
+        )
+        
+        # Извлекаем текст ответа из словаря
+        if isinstance(improved_result_dict, dict):
+            improved_result = improved_result_dict.get('response', 'Результат не получен')
+        else:
+            improved_result = str(improved_result_dict)
+            improved_result = fix_json_trailing_commas(improved_result)
+        
+        print("=== Улучшение завершено ===")
+        print(f"Результат: {improved_result[:200]}...")
+        
+        return {
+            "status": "success",
+            "message": "Анализ успешно улучшен",
+            "data": {
+                "improvedResult": improved_result
+            }
+        }
+    
+    except Exception as e:
+        print(f"=== ОШИБКА ===")
+        print(f"Тип ошибки: {type(e).__name__}")
+        print(f"Сообщение: {str(e)}")
+        
+        return {
+            "status": "error",
+            "message": f"Произошла ошибка при улучшении анализа: {str(e)}",
+            "data": {
+                "improvedResult": "К сожалению, не удалось улучшить анализ. Пожалуйста, попробуйте позже."
+            }
+        }
 
 @app.get("/health")
 async def health_check():
