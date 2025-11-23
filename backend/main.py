@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.model_analyze import save_models_results
+from src.model_summarize import save_summarized_result
 from src.prompts import get_product_analysis_prompt
 
 app = FastAPI()
@@ -28,133 +29,86 @@ class ComparisonRequest(BaseModel):
     banks: List[str]
     criteria: List[str]
 
-# Эндпоинт для сохранения параметров
+# Эндпоинт для сравнения продуктов
 @app.post("/api/params")
 async def compare_products(request: ComparisonRequest):
     """
-    Принимает выбранные параметры и сохраняет результат выбора в массивы
+    Принимает выбранные параметры, выполняет анализ и возвращает результат
     """
-    print("=== Получены данные ===")
-    print(f"Типы карт: {request.cardType}")
-    print(f"Банки: {request.banks}")
-    print(f"Критерии: {request.criteria}")
+    try:
+        print("=== Получены данные ===")
+        print(f"Типы карт: {request.cardType}")
+        print(f"Банки: {request.banks}")
+        print(f"Критерии: {request.criteria}")
 
-    # Преобразуем в массивы Python
-    card_types = request.cardType
-    banks = request.banks
-    criteria = request.criteria
+        # Преобразуем в массивы Python
+        card_types = request.cardType
+        banks = request.banks
+        criteria = request.criteria
 
-    # Здесь логика запускается функция парсера, на вход подаются
-    # Вход: card_types, banks, criteria
-    # Выход: json-файл, сохраняется в src/data/analysis_data.json
-    analysis_data = """
-    {
-  "analysis_parameters": {
-    "competitors": ["Сбер", "ВТБ", "Альфа-Банк", "Тинькофф"],
-    "product": "Тарифы",
-    "criteria": [
-      "Бесплатное обслуживание",
-      "Бесплатные СМС-уведомления",
-      "Бесплатное снятие наличных в других банках",
-      "Бесплатные переводы по реквизитам",
-      "Процент на остаток",
-      "Кэшбэк от партнеров"
-    ]
-  },
-  "comparison_table": [
-    {
-      "criterion": "Бесплатное обслуживание",
-      "scores": {
-        "Сбер": true,
-        "ВТБ": 1000,
-        "Альфа-Банк": 500,
-        "Тинькофф": true
-      }
-    },
-    {
-      "criterion": "Бесплатные СМС-уведомления",
-      "scores": {
-        "Сбер": true,
-        "ВТБ": true,
-        "Альфа-Банк": 50,
-        "Тинькофф": true
-      }
-    },
-    {
-      "criterion": "Бесплатное снятие наличных в других банках",
-      "scores": {
-        "Сбер": 2,
-        "ВТБ": 1,
-        "Альфа-Банк": true,
-        "Тинькофф": 5
-      }
-    },
-    {
-      "criterion": "Бесплатные переводы по реквизитам",
-      "scores": {
-        "Сбер": true,
-        "ВТБ": true,
-        "Альфа-Банк": true,
-        "Тинькофф": true
-      }
-    },
-    {
-      "criterion": "Процент на остаток",
-      "scores": {
-        "Сбер": 11.7,
-        "ВТБ": 20.0,
-        "Альфа-Банк": false,
-        "Тинькофф": 12
-      }
-    },
-    {
-      "criterion": "Кэшбэк от партнеров",
-      "scores": {
-        "Сбер": true,
-        "ВТБ": true,
-        "Альфа-Банк": true,
-        "Тинькофф": true
-      }
-    }
-  ],
-  "conclusions": {
-    "best_bank": "Тинькофф",
-    "sber_advantages": [
-      "Бесплатные СМС-уведомления",
-      "Бесплатные переводы по реквизитам",
-      "Процент на остаток",
-      "Кэшбэк от партнеров"
-    ],
-    "sber_improvements": [
-      "Бесплатное обслуживание",
-      "Бесплатное снятие наличных в других банках"
-    ]
-  }
-}
-    """
-    # Запуск функции model_analyze.save_models_results
-    
-    prompt = get_product_analysis_prompt(analysis_data)
-    models_analysis_result = save_models_results(prompt)
-    print(models_analysis_result)
-    with open('src/data/analysis_results.txt', 'w', encoding='utf-8') as f:
-        for i, model_result in enumerate(models_analysis_result, 1):
-            f.write(f"=== Результат анализа {i} ===\n")
-            f.write(str(model_result) + "\n")
-            f.write("=" * 50 + "\n\n")
+        # Генерируем промпт для анализа
+        prompt = get_product_analysis_prompt(banks, criteria)
+        
+        # Запускаем анализ моделей
+        print("=== Запуск анализа моделей ===")
+        models_analysis_results = save_models_results(prompt)
+        
+        # Получаем суммаризированный результат
+        print("=== Генерация итогового результата ===")
+        summarized_result_dict = save_summarized_result(models_analysis_results)
+        
+        # Извлекаем текст ответа из словаря
+        if isinstance(summarized_result_dict, dict):
+            summarized_result = summarized_result_dict.get('response', 'Результат не получен')
+        else:
+            summarized_result = str(summarized_result_dict)
+        
+        print("=== Анализ завершен ===")
+        print(f"Результат: {summarized_result[:200]}...")  # Выводим первые 200 символов
 
-    # Пример ответа
-    return {
-        "status": "success",
-        "message": "Данные успешно получены",
-        "data": {
-            "cardTypes": card_types,
-            "banks": banks,
-            "criteria": criteria,
-            "comparisonResult": "Результат сравнения будет здесь"
+        # Возвращаем успешный ответ с результатом
+        return {
+            "status": "success",
+            "message": "Анализ успешно выполнен",
+            "data": {
+                "cardTypes": card_types,
+                "banks": banks,
+                "criteria": criteria,
+                "summarizedResult": summarized_result  # Передаем результат на фронтенд
+            }
         }
-    }
+    
+    except Exception as e:
+        # Обработка ошибок
+        print(f"=== ОШИБКА ===")
+        print(f"Тип ошибки: {type(e).__name__}")
+        print(f"Сообщение: {str(e)}")
+        
+        return {
+            "status": "error",
+            "message": f"Произошла ошибка при анализе: {str(e)}",
+            "data": {
+                "cardTypes": request.cardType,
+                "banks": request.banks,
+                "criteria": request.criteria,
+                "summarizedResult": "К сожалению, не удалось выполнить анализ. Пожалуйста, попробуйте позже."
+            }
+        }
 
 @app.get("/")
 async def read_root():
-    return {"message": "Hello from FastAPI backend!"}
+    return {
+        "message": "ИИ-Агент",
+        "version": "1.0",
+        "endpoints": {
+            "compare": "/api/params (POST)"
+        }
+    }
+
+@app.get("/health")
+async def health_check():
+    """Проверка работоспособности сервера"""
+    return {
+        "status": "healthy",
+        "message": "Backend is running"
+    }

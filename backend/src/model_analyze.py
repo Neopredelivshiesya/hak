@@ -4,7 +4,7 @@ import os
 from gigachat import GigaChat
 
 # Конфигурация для OpenRouter
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or "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"
 OPENROUTER_MODELS = ["x-ai/grok-4.1-fast:free", "deepseek/deepseek-r1-0528-qwen3-8b"]
 
 # Конфигурация для GigaChat
@@ -131,11 +131,11 @@ def save_models_results(prompt):
     for model in OPENROUTER_MODELS:
         result = make_openrouter_request(model, prompt)
         print(f"Имя модели: {model}")
-        all_results.append(result)
+        all_results.append(str(result))
     
     # Обработка GigaChat
     gigachat_result = make_gigachat_request(prompt)
-    all_results.append(gigachat_result)
+    all_results.append(str(gigachat_result))
     
     return all_results
 
