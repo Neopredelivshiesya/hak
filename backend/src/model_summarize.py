@@ -3,7 +3,7 @@ import json
 import os
 
 # Конфигурация для OpenRouter
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or "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"
 OPENROUTER_MODEL = "deepseek/deepseek-r1-0528-qwen3-8b"
 
 

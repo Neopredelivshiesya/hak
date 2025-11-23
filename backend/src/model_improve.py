@@ -1,23 +1,16 @@
 import requests
 import json
 import os
-from gigachat import GigaChat
 
 # Конфигурация для OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or "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"
-OPENROUTER_MODELS = ["x-ai/grok-4.1-fast:free", "deepseek/deepseek-r1-0528-qwen3-8b"]
+OPENROUTER_MODEL = "deepseek/deepseek-r1-0528-qwen3-8b"
 
-# Конфигурация для GigaChat
-GIGACHAT_CREDENTIALS = 'MDE5YWFiZTAtNjE1Zi03ZGNiLWJlMGItZjlkMzA5NWI0MTVmOjY5NWZmZDQ1LTdhYWEtNDdiOC1hMWMwLTRmZWYwYzYxNTNhOA=='
-giga = GigaChat(
-    credentials=GIGACHAT_CREDENTIALS,
-    verify_ssl_certs=False 
-)
 
-def make_openrouter_request(model, prompt):
+def make_openrouter_request(model, text):
     """Выполняет запрос к OpenRouter API для указанной модели и возвращает результаты."""
     try:
-        print(f"=== Запрос для модели {model} (OpenRouter) ===")
+        print(f"=== Запрос для модели {OPENROUTER_MODEL} (OpenRouter) ===")
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -29,7 +22,7 @@ def make_openrouter_request(model, prompt):
                 "messages": [
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": text
                     }
                 ],
                 "extra_body": {"reasoning": {"enabled": True}}
@@ -96,46 +89,55 @@ def make_openrouter_request(model, prompt):
             "status_code": -3
         }
 
-def make_gigachat_request(prompt):
-    """Выполняет запрос к GigaChat API и возвращает результаты."""
-    model_name = "giga-chat"
-    try:
-        print(f"=== Запрос для модели {model_name} (GigaChat) ===")
-        response = giga.chat(prompt)
-        content = response.choices[0].message.content
-        reasoning_present = False 
-        
-        print(f"Ответ: {content}")
-        print(f"Reasoning details присутствуют: {reasoning_present}")
-        
-        return {
-            "model": model_name,
-            "response": content,
-            "reasoning_present": reasoning_present,
-            "status_code": 200
-        }
-            
-    except Exception as e:
-        print(f"Ошибка для {model_name}: {e}")
-        return {
-            "model": model_name,
-            "response": f"Ошибка: {e}",
-            "reasoning_present": False,
-            "status_code": -3
-        }
+def improve_analysis_with_user_query(models_analysis_results, user_query):
+    """
+    Улучшает анализ на основе запроса пользователя.
+    
+    Args:
+        models_analysis_results: Список результатов анализа от моделей
+        user_query: Запрос пользователя для уточнения/улучшения анализа
+    
+    Returns:
+        Словарь с результатом улучшенного анализа
+    """
+    analysis_text = ''.join(models_analysis_results)
+    
+    prompt = f"""
+Роль (Role)
+Ты — продуктовый аналитик. Твоя задача — улучшить и дополнить существующий анализ на основе запроса пользователя.
 
-def save_models_results(prompt):
-    all_results = []
+Контекст (Context)
+Ты получаешь на вход:
+1. Результаты анализа от трех AI-моделей
+2. Запрос пользователя, который хочет уточнить или улучшить анализ
+
+Задача (Goal)
+На основе существующего анализа и запроса пользователя создать улучшенный и более детальный ответ, который:
+- Учитывает все данные из исходного анализа
+- Отвечает на конкретный запрос пользователя
+- Предоставляет дополнительную информацию, если это необходимо
+- Сохраняет структурированность и читаемость
+
+Процесс (Action Steps)
+1. Внимательно изучи исходный анализ от всех трех моделей
+2. Пойми, что именно хочет узнать пользователь из своего запроса
+3. Используй информацию из анализа для ответа на запрос
+4. Если в анализе нет нужной информации, укажи это, но попробуй дать полезный ответ на основе имеющихся данных
+5. Структурируй ответ так, чтобы он был понятен и полезен
+
+Формат Вывода (Output Format)
+Ответ должен быть структурированным и понятным. Используй форматирование для улучшения читаемости.
+
+ИСХОДНЫЙ АНАЛИЗ:
+{analysis_text}
+
+ЗАПРОС ПОЛЬЗОВОВАТЕЛЯ:
+{user_query}
+
+УЛУЧШЕННЫЙ ОТВЕТ:
+"""
     
-    # Обработка OpenRouter моделей
-    for model in OPENROUTER_MODELS:
-        result = make_openrouter_request(model, prompt)
-        print(f"Имя модели: {model}")
-        all_results.append(str(result))
+    improved_result = make_openrouter_request(OPENROUTER_MODEL, prompt)
     
-    # Обработка GigaChat
-    gigachat_result = make_gigachat_request(prompt)
-    all_results.append(str(gigachat_result))
-    
-    return all_results
+    return improved_result
 
